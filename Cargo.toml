@@ -12,6 +12,12 @@ crate-type = ["cdylib"]
 jni = "*"
 lazy_static = "*"
 once_cell = "*"
+log = "*"
+log-panics = { version = "2", features = ["with-backtrace"]}
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "*"
+
 
 [dependencies.tokio]
 version = "*"
@@ -21,4 +27,4 @@ features = ["full"]
 [profile.release]
 lto = true
 codegen-units = 1
-strip = "debuginfo"
+debug = true
