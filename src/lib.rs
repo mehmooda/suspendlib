@@ -1,6 +1,6 @@
 use std::{ffi::c_void, ptr::null};
 
-use jni::objects::{GlobalRef, JObject};
+use jni::{objects::{GlobalRef, JObject}, NativeMethod};
 use once_cell::sync::OnceCell;
 
 lazy_static::lazy_static!(
@@ -10,8 +10,6 @@ lazy_static::lazy_static!(
 
 #[repr(transparent)]
 struct Continuation(GlobalRef);
-
-unsafe impl Send for Continuation {}
 
 static mut MPSC_SENDER: Option<tokio::sync::mpsc::UnboundedSender<Continuation>> = None;
 
@@ -29,6 +27,19 @@ fn COROUTINE_SUSPENDED(env: jni::JNIEnv) -> jni::sys::jobject {
     });
 
     r.as_obj().into_inner()
+}
+
+struct Job(GlobalRef);
+
+fn get_job(env: &jni::JNIEnv, continuation: &Continuation) -> Option<Job> {
+
+    let context = env.call_method(continuation.0.as_obj(), "getContext", "()Lkotlinx/coroutines/CoroutineContext;", &[]).unwrap().l().unwrap();
+    dbg!(context);
+    let job_key = env.get_static_field("kotlinx/coroutines/Job", "Key", "Lkotlinx/coroutines/Job$Key;").unwrap();
+    dbg!(job_key);
+    let job = env.call_method(context, "get", "(Lkotlin/coroutines/CoroutineContext$Key;)Lkotlinx/coroutines/CoroutineContext$Element;", &[job_key]).unwrap();
+    dbg!(job);    
+    None
 }
 
 fn continuation_thread(jvm: jni::JavaVM) {
@@ -62,23 +73,36 @@ fn continuation_thread(jvm: jni::JavaVM) {
 #[no_mangle]
 pub extern "system" fn JNI_OnLoad(jvm: jni::JavaVM, reserved: c_void) -> i32 {
     println!("JNI_Onload");
+
+    jvm.get_env().unwrap().register_native_methods("uk/co/dcomp/ui/login/Native", &[NativeMethod{
+        name: "Suspend".into(),
+        sig: "(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;".into(),
+        fn_ptr: Java_uk_co_dcomp_ui_login_Native_Suspend as _
+    }]).unwrap();
+
+
     std::thread::Builder::new()
         .name("Rust_JNI_Continuation_Thread".into())
         .spawn(|| continuation_thread(jvm))
         .unwrap();
     println!("JNI_Onload_ends");
 
+
+
     jni::JNIVersion::V8.into()
 }
 
 #[no_mangle]
-pub extern "system" fn Java_uk_co_dcomp_ui_login_Native_Suspend(
+extern "system" fn Java_uk_co_dcomp_ui_login_Native_Suspend(
     env: jni::JNIEnv,
     this: JObject,
     continuation: JObject,
 ) -> jni::sys::jobject {
     println!("JNI_Method");
     let continuation = Continuation(env.new_global_ref(continuation).unwrap());
+
+    get_job(&env, &continuation);
+
     let jh = RUNTIME.spawn(Statics_Method());
     RUNTIME.spawn(async {
         let res = jh.await;
