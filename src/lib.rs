@@ -26,7 +26,7 @@ fn COROUTINE_SUSPENDED(env: jni::JNIEnv) -> jni::sys::jobject {
         env.new_global_ref(c.unwrap().l().unwrap()).unwrap()
     });
 
-    r.as_obj().into_inner()
+    r.as_obj().into_raw()
 }
 
 struct Job(GlobalRef);
