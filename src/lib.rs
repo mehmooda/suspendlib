@@ -125,7 +125,7 @@ fn make_cancellable(
 
     let s = Box::into_raw(Box::new(s)) as i64;
 
-    let fake = env
+    let native_callback = env
         .new_object("uk/co/dcomp/ui/login/Fake", "(J)V", &[s.into()])
         .junwrap();
 
@@ -142,7 +142,7 @@ fn make_cancellable(
         cancellable,
         "invokeOnCancellation",
         "(Lkotlin/jvm/functions/Function1;)V",
-        &[fake.into()],
+        &[native_callback.into()],
     )
     .junwrap();
     let ob = env
